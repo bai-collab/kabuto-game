@@ -97,6 +97,27 @@ const Renderer = (() => {
         }
     }
 
+    // === 新增：高溫熱氣特效 ===
+    function drawHeatHaze(w, h, temp) {
+        if (temp <= 30) return;
+        const intensity = Math.min(1, (temp - 30) / 5);
+        ctx.save();
+        const t = Date.now() / 200;
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.05 * intensity})`;
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 15; i++) {
+            const x = (i * w / 15) + Math.sin(t + i) * 10;
+            ctx.beginPath();
+            ctx.moveTo(x, h * 0.3);
+            for (let y = h * 0.3; y < h * 0.9; y += 20) {
+                const xOff = Math.sin(t + y / 50 + i) * (5 * intensity);
+                ctx.lineTo(x + xOff, y);
+            }
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
     function drawSun(w, hour) {
         const t = (hour - 6) / 12; // 0-1 across day
         const x = w * 0.2 + t * w * 0.6;
@@ -413,6 +434,7 @@ const Renderer = (() => {
 
     return {
         init, clear, drawBackground, drawBox, drawParticles, frame,
+        drawHeatHaze,
         spawnSprayParticles, spawnSoilParticles, spawnInteractParticles,
         getCanvasSize, getCtx, getCanvas, resize
     };

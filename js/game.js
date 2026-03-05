@@ -98,8 +98,10 @@ const Game = (() => {
 
     // ========== 濕度衰減 ==========
     const shadeEvapMod = state.isShaded ? 0.5 : 1;
+    // 高溫大幅加速蒸發
+    const heatEvapMod = state.temperature > 30 ? (1 + (state.temperature - 30) * 0.5) : 1;
     const tempFactor = state.temperature > 25 ? 1.5 : 1;
-    const evapRate = (isDay() ? 4 : 2) * tempFactor * shadeEvapMod;
+    const evapRate = (isDay() ? 4 : 2) * tempFactor * shadeEvapMod * heatEvapMod;
     state.moisture = Math.max(0, state.moisture - evapRate);
 
     // ========== 淹水判定 ==========
@@ -158,8 +160,13 @@ const Game = (() => {
     }
 
     // 溫度影響
-    if (state.temperature < 18 || state.temperature > 30) powerDelta -= 3;
-    else if (state.temperature < 20 || state.temperature > 28) powerDelta -= 1;
+    if (state.temperature < 18 || state.temperature > 32) {
+      powerDelta -= 4; // 極端溫度
+      if (state.temperature > 32) {
+        onEvent('heat-stress', '🌡️ 溫度過高！幼蟲正處於熱壓力狀態，體力迅速流失！');
+      }
+    }
+    else if (state.temperature < 20 || state.temperature > 30) powerDelta -= 1.5;
     else if (state.temperature >= 20 && state.temperature <= 25) powerDelta += 0.5;
 
     // 蛹室崩塌嚴重扣血
@@ -179,7 +186,9 @@ const Game = (() => {
       state.totalGrowth += growthRate;
 
       if (state.numLevel >= 2 && state.numLevel <= 4) {
-        state.numSize = Math.min(100, state.numSize + growthRate * 0.3);
+        // 高溫抑制成長
+        const heatGrowthMod = state.temperature > 30 ? 0.5 : 1;
+        state.numSize = Math.min(100, state.numSize + growthRate * 0.3 * heatGrowthMod);
       }
     } else if (state.numLevel === 5 && state.pupaBuilt && !state.chamberCollapsed) {
       // 蛹期：環境穩定就持續成長
@@ -227,12 +236,14 @@ const Game = (() => {
 
   // ========== 溫度系統 ==========
   function updateTemperature() {
-    const baseTemp = 22;
-    const dayOffset = isDay() ? 2.5 : -1.5;
-    const shadeOffset = state.isShaded ? -3 : 0; // 遮陰降溫
-    const random = (Math.random() - 0.5) * 1.5;
+    const baseTemp = 24; // 基礎溫度稍微調高以配合新範圍
+    const dayOffset = isDay() ? 6 : -2; // 加大日夜溫差
+    const shadeOffset = state.isShaded ? -5 : 0; // 遮陰效果更強
+    const random = (Math.random() - 0.5) * 2;
     const target = baseTemp + dayOffset + shadeOffset + random;
-    state.temperature += (target - state.temperature) * 0.15;
+    // 限制在 15~36 之間
+    const clampedTarget = Math.max(15, Math.min(36, target));
+    state.temperature += (clampedTarget - state.temperature) * 0.15;
     state.temperature = Math.round(state.temperature * 10) / 10;
   }
 

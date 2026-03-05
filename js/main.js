@@ -93,9 +93,16 @@
         beetlePos.x = w * 0.45;
         beetlePos.y = h * 0.65;
 
+        // 高溫抖動效果
+        if (state.temperature > 32) {
+            beetlePos.x += (Math.random() - 0.5) * 4;
+            beetlePos.y += (Math.random() - 0.5) * 4;
+        }
+
         // 繪製
         Renderer.clear();
         Renderer.drawBackground(isDay, state.numHour);
+        Renderer.drawHeatHaze(w, h, state.temperature); // 新增：高溫熱氣
         Renderer.drawBox(state.moisture, state.soilQuality, state);
 
         // 蛹室視覺（蛹期時在蟲蟲下方畫蛹室輪廓）
