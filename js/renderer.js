@@ -143,19 +143,36 @@ const Renderer = (() => {
     }
 
     // ========== 飼育箱 ==========
-    function drawBox(moisture, soilQuality) {
+    function drawBox(moisture, soilQuality, gameState) {
         const { w, h } = getCanvasSize();
         const boxX = w * 0.08;
         const boxY = h * 0.42;
         const boxW = w * 0.84;
         const boxH = h * 0.48;
 
+        // 遮陰蓋
+        if (gameState && gameState.isShaded) {
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+            ctx.fillRect(boxX, boxY - 20, boxW, 18);
+            ctx.strokeStyle = '#5a4020';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(boxX, boxY - 2);
+            ctx.lineTo(boxX + boxW, boxY - 2);
+            ctx.stroke();
+            // 遮陰紋理
+            ctx.fillStyle = 'rgba(80, 60, 30, 0.4)';
+            for (let i = 0; i < 8; i++) {
+                ctx.fillRect(boxX + i * (boxW / 8), boxY - 20, boxW / 16, 18);
+            }
+            ctx.restore();
+        }
+
         // 箱體
         ctx.strokeStyle = '#6a4a20';
         ctx.lineWidth = 3;
         ctx.fillStyle = 'rgba(60, 40, 15, 0.6)';
-
-        // 圓角矩形
         roundRect(ctx, boxX, boxY, boxW, boxH, 12, true, true);
 
         // 箱框裝飾線
@@ -167,14 +184,12 @@ const Renderer = (() => {
         const soilY = boxY + boxH * 0.25;
         const soilH = boxH * 0.7;
 
-        // 土壤顏色隨品質和濕度變化
         const soilDark = soilQuality > 50 ? 0.25 : 0.18;
         const moistFactor = moisture / 100;
         const r = Math.floor(60 + soilQuality * 0.4 - moistFactor * 20);
         const g = Math.floor(35 + soilQuality * 0.2 - moistFactor * 10);
         const b = Math.floor(10 + moistFactor * 15);
         ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-
         roundRect(ctx, boxX + 6, soilY, boxW - 12, soilH - 6, 6, true, false);
 
         // 土壤紋理
@@ -187,8 +202,65 @@ const Renderer = (() => {
             ctx.fill();
         }
 
-        // 土壤表面高光（濕度高時反光）
-        if (moisture > 60) {
+        // === 龜裂土壤（濕度 < 20）===
+        if (moisture < 20) {
+            ctx.save();
+            ctx.strokeStyle = `rgba(160, 130, 80, ${0.4 + (20 - moisture) / 40})`;
+            ctx.lineWidth = 1.5;
+            const crackSeeds = [17, 53, 89, 127, 163, 199, 241, 277, 313];
+            for (let i = 0; i < crackSeeds.length; i++) {
+                const seed = crackSeeds[i];
+                const cx = boxX + 20 + (seed * 3.7) % (boxW - 40);
+                const cy = soilY + 8 + (seed * 2.3) % (soilH - 20);
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                // 隨機鋸齒裂紋
+                let px = cx, py = cy;
+                for (let j = 0; j < 4; j++) {
+                    px += ((seed * (j + 1) * 7) % 20) - 10;
+                    py += ((seed * (j + 1) * 11) % 12) + 2;
+                    ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+            }
+            // 乾裂色調覆蓋
+            ctx.fillStyle = `rgba(180, 150, 100, ${(20 - moisture) / 60})`;
+            roundRect(ctx, boxX + 6, soilY, boxW - 12, soilH - 6, 6, true, false);
+            ctx.restore();
+        }
+
+        // === 淹水效果（濕度 > 85）===
+        if (moisture > 85) {
+            ctx.save();
+            const waterLevel = ((moisture - 85) / 15) * (soilH * 0.25);
+            const waterY = soilY + soilH - 6 - waterLevel;
+
+            // 水面
+            const waterGrad = ctx.createLinearGradient(0, waterY, 0, waterY + waterLevel);
+            waterGrad.addColorStop(0, `rgba(80, 140, 200, 0.35)`);
+            waterGrad.addColorStop(1, `rgba(60, 110, 170, 0.5)`);
+            ctx.fillStyle = waterGrad;
+            roundRect(ctx, boxX + 6, waterY, boxW - 12, waterLevel, 4, true, false);
+
+            // 水面波紋
+            ctx.strokeStyle = `rgba(160, 200, 255, 0.4)`;
+            ctx.lineWidth = 1;
+            const t = Date.now() / 800;
+            for (let i = 0; i < 3; i++) {
+                ctx.beginPath();
+                const waveY = waterY + 2 + i * 4;
+                for (let x = boxX + 10; x < boxX + boxW - 10; x += 3) {
+                    const yOff = Math.sin((x - boxX) / 20 + t + i * 2) * 2;
+                    if (x === boxX + 10) ctx.moveTo(x, waveY + yOff);
+                    else ctx.lineTo(x, waveY + yOff);
+                }
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        // 土壤表面高光
+        if (moisture > 60 && moisture <= 85) {
             ctx.fillStyle = `rgba(140, 160, 200, ${(moisture - 60) / 200})`;
             ctx.beginPath();
             ctx.ellipse(boxX + boxW * 0.3, soilY + 5, boxW * 0.15, 3, 0, 0, Math.PI * 2);

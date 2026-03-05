@@ -4,7 +4,7 @@
    ============================================ */
 
 const Game = (() => {
-  const HOUR_INTERVAL = 1000; // ms per game-hour
+  let hourInterval = 1000; // ms per game-hour (mutable for speed control)
   const MAX_DAYS = 14;
 
   let state = {};
@@ -25,16 +25,19 @@ const Game = (() => {
       moisture: 50,
       soilQuality: 100,
       hunger: 60,
-      // === v3 新增 ===
-      temperature: 23,        // 環境溫度 °C
-      soilDepth: 8,           // 土壤深度 cm (5-10 理想)
-      soilCompaction: 70,     // 土壤壓實度 0-100
-      pupaBuilt: false,       // 蛹室是否已建造
-      pupaIntegrity: 0,       // 蛹室完整度 0-100
-      pupaWarning: '',        // 蛹室警告訊息
-      dormancyHours: 0,       // 羽化後蟄伏剩餘時數
-      isDormant: false,       // 是否在蟄伏期
-      chamberCollapsed: false,// 蛹室是否崩塌
+      temperature: 23,
+      soilDepth: 8,
+      soilCompaction: 70,
+      pupaBuilt: false,
+      pupaIntegrity: 0,
+      pupaWarning: '',
+      dormancyHours: 0,
+      isDormant: false,
+      chamberCollapsed: false,
+      // === v4 新增 ===
+      isShaded: false,        // 是否有遮陰
+      isFlooded: false,       // 是否淹水
+      gameSpeed: 1,           // 1 = 1s/hr, 2 = 1s/30min
       // ================
       bAlive: true,
       bGameover: false,
@@ -57,7 +60,7 @@ const Game = (() => {
 
   function playTimer() {
     if (timerID) return;
-    timerID = setInterval(addHour, HOUR_INTERVAL);
+    timerID = setInterval(addHour, hourInterval);
   }
 
   function stopTimer() {
@@ -94,9 +97,13 @@ const Game = (() => {
     }
 
     // ========== 濕度衰減 ==========
+    const shadeEvapMod = state.isShaded ? 0.5 : 1;
     const tempFactor = state.temperature > 25 ? 1.5 : 1;
-    const evapRate = (isDay() ? 4 : 2) * tempFactor;
+    const evapRate = (isDay() ? 4 : 2) * tempFactor * shadeEvapMod;
     state.moisture = Math.max(0, state.moisture - evapRate);
+
+    // ========== 淹水判定 ==========
+    state.isFlooded = state.moisture > 85;
 
     // ========== 土壤消耗 ==========
     state.soilQuality = Math.max(0, state.soilQuality - 0.5);
@@ -220,12 +227,11 @@ const Game = (() => {
 
   // ========== 溫度系統 ==========
   function updateTemperature() {
-    // 自然日夜溫差：白天偏高，夜晚偏低
     const baseTemp = 22;
     const dayOffset = isDay() ? 2.5 : -1.5;
+    const shadeOffset = state.isShaded ? -3 : 0; // 遮陰降溫
     const random = (Math.random() - 0.5) * 1.5;
-    const target = baseTemp + dayOffset + random;
-    // 緩慢趨向目標
+    const target = baseTemp + dayOffset + shadeOffset + random;
     state.temperature += (target - state.temperature) * 0.15;
     state.temperature = Math.round(state.temperature * 10) / 10;
   }
@@ -461,9 +467,36 @@ const Game = (() => {
     playTimer();
   }
 
+  // ========== 遮陰控制 ==========
+  function toggleShade() {
+    if (!state.bAlive || state.phase !== 'playing') return false;
+    state.isShaded = !state.isShaded;
+    return true;
+  }
+
+  // ========== 遊戲速度控制 ==========
+  function toggleSpeed() {
+    if (state.gameSpeed === 1) {
+      state.gameSpeed = 2;
+      hourInterval = 2000; // 1s = 30 min = 2s per hour
+    } else {
+      state.gameSpeed = 1;
+      hourInterval = 1000; // 1s = 1 hour
+    }
+    // 重新啟動計時器
+    if (timerID) {
+      stopTimer();
+      playTimer();
+    }
+    return state.gameSpeed;
+  }
+
+  function getSpeed() { return state.gameSpeed; }
+
   return {
     init, start, stop: stopTimer, spray, changeSoil, compactSoil,
     feed, interact, tryLevelUp, isDay, calcScore, getRank, getState,
-    pause, resume, playTimer, stopTimer, buildPupaChamber, rebuildChamber
+    pause, resume, playTimer, stopTimer, buildPupaChamber, rebuildChamber,
+    toggleShade, toggleSpeed, getSpeed
   };
 })();

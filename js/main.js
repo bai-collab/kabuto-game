@@ -27,6 +27,8 @@
             onCompact: handleCompact,
             onPhoto: handlePhoto,
             onRebuild: handleRebuild,
+            onShade: handleShade,
+            onSpeed: handleSpeed,
             onRestart: handleRestart,
             onGrowthOk: handleGrowthOk,
             onDiaryClose: handleDiaryClose,
@@ -94,7 +96,7 @@
         // 繪製
         Renderer.clear();
         Renderer.drawBackground(isDay, state.numHour);
-        Renderer.drawBox(state.moisture, state.soilQuality);
+        Renderer.drawBox(state.moisture, state.soilQuality, state);
 
         // 蛹室視覺（蛹期時在蟲蟲下方畫蛹室輪廓）
         if (state.numLevel === 5 && state.pupaBuilt) {
@@ -242,6 +244,23 @@
     function handleRebuild() {
         if (gamePhase !== 'playing') return;
         Game.rebuildChamber();
+    }
+
+    function handleShade() {
+        if (gamePhase !== 'playing') return;
+        const ok = Game.toggleShade();
+        if (ok) {
+            const state = Game.getState();
+            UI.showCloudToast(state.isShaded ? '🌿 已蓋上遮陰蓋' : '☀️ 已移除遮陰，讓陽光照入');
+            UI.updateShadeBtn(state.isShaded);
+        }
+    }
+
+    function handleSpeed() {
+        if (gamePhase !== 'playing') return;
+        const speed = Game.toggleSpeed();
+        UI.showCloudToast(speed === 1 ? '⏩ 速度：1秒 = 1小時' : '⏸️ 速度：1秒 = 30分鐘');
+        UI.updateSpeedBtn(speed);
     }
 
     function handlePhoto() {

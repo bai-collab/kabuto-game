@@ -44,6 +44,14 @@ const UI = (() => {
             startCooldown('rebuild');
         });
 
+        document.getElementById('btn-shade').addEventListener('click', () => {
+            if (callbacks.onShade) callbacks.onShade();
+        });
+
+        document.getElementById('btn-speed').addEventListener('click', () => {
+            if (callbacks.onSpeed) callbacks.onSpeed();
+        });
+
         document.getElementById('btn-diary-close').addEventListener('click', () => {
             hideDiary();
             if (callbacks.onDiaryClose) callbacks.onDiaryClose();
@@ -305,11 +313,23 @@ const UI = (() => {
         el.style.animation = 'toastIn 0.3s ease';
         setTimeout(() => el.classList.add('hidden'), 3000);
     }
+    function updateShadeBtn(isShaded) {
+        const btn = document.getElementById('btn-shade');
+        btn.querySelector('.btn-icon').textContent = isShaded ? '☀️' : '🌿';
+        btn.querySelector('.btn-text').textContent = isShaded ? '曬太陽' : '遮陰';
+    }
+
+    function updateSpeedBtn(speed) {
+        const btn = document.getElementById('btn-speed');
+        btn.querySelector('.btn-icon').textContent = speed === 1 ? '⏩' : '⏸️';
+        btn.querySelector('.btn-text').textContent = speed === 1 ? '1x' : '0.5x';
+    }
 
     return {
         init, showPlaying, showEnding, updateHUD,
         showGrowthNotify, showEventNotify, hideGrowthNotify,
         showDiary, hideDiary, showInteractFeedback,
-        showSettings, hideSettings, showCloudToast
+        showSettings, hideSettings, showCloudToast,
+        updateShadeBtn, updateSpeedBtn
     };
 })();
