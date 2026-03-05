@@ -40,6 +40,13 @@
           <span class="stat-val" id="val-moisture">50</span>
         </div>
         <div class="stat-bar">
+          <label>🌡 溫度</label>
+          <div class="bar-track">
+            <div class="bar-fill temp-fill" id="bar-temp"></div>
+          </div>
+          <span class="stat-val" id="val-temp">23°</span>
+        </div>
+        <div class="stat-bar">
           <label>🌿 土壤</label>
           <div class="bar-track">
             <div class="bar-fill soil-fill" id="bar-soil"></div>
@@ -61,6 +68,16 @@
           <span class="stat-val" id="val-size">10</span>
         </div>
       </div>
+      <div id="hud-pupa" class="hidden">
+        <div class="stat-bar">
+          <label>🏠 蛹室</label>
+          <div class="bar-track">
+            <div class="bar-fill pupa-fill" id="bar-pupa"></div>
+          </div>
+          <span class="stat-val" id="val-pupa">0</span>
+        </div>
+        <div id="pupa-warning" class="pupa-warning"></div>
+      </div>
       <div id="hud-stage">
         <span id="stage-label">🥚 卵</span>
         <span id="photo-count">📷 0/6</span>
@@ -81,9 +98,17 @@
         <span class="btn-icon">🌱</span>
         <span class="btn-text">換土</span>
       </button>
+      <button class="action-btn" id="btn-compact" title="壓實土壤">
+        <span class="btn-icon">✊</span>
+        <span class="btn-text">壓實</span>
+      </button>
       <button class="action-btn" id="btn-photo" title="拍照記錄">
         <span class="btn-icon">📷</span>
         <span class="btn-text">拍照</span>
+      </button>
+      <button class="action-btn hidden" id="btn-rebuild" title="緊急重建蛹室">
+        <span class="btn-icon">🔧</span>
+        <span class="btn-text">重建蛹室</span>
       </button>
     </div>
 
@@ -95,8 +120,9 @@
         <p class="title-desc">從卵開始，細心照顧你的獨角仙<br>讓牠順利羽化為威風的成蟲吧！</p>
         <button id="btn-start" class="start-btn">▶ 開始飼育</button>
         <div class="title-tips">
-          <p>💧 噴水保濕 ｜ 🍖 餵食 ｜ 🌱 更換飼育土 ｜ 📷 記錄成長</p>
-          <p>🖱️ 點擊蟲蟲可以互動喔！</p>
+          <p>💧 噴水 ｜ 🍖 餵食 ｜ 🌱 換土 ｜ ✊ 壓實 ｜ 📷 拍照</p>
+          <p>🌡 真實模擬：溫度、土壤深度、蛹室建造、羍化蛟伏</p>
+          <p>🖱️ 點擊蟲蟲可以互動（蛹期請勿打擾！）</p>
         </div>
         <button id="btn-settings" class="settings-link">⚙️ Google Sheets 設定</button>
       </div>

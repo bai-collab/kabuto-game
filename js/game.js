@@ -1,18 +1,18 @@
 /* ============================================
-   game.js — 遊戲核心引擎
-   時間系統、成長判定、數值管理
+   game.js — 遊戲核心引擎 v3
+   真實模擬：溫度、蛹室、羽化蟄伏
    ============================================ */
 
 const Game = (() => {
-  // 遊戲速度：每秒 = 遊戲內 1 小時
-  const HOUR_INTERVAL = 1000; // ms
-  const MAX_DAYS = 10;
+  const HOUR_INTERVAL = 1000; // ms per game-hour
+  const MAX_DAYS = 14;
 
   let state = {};
   let timerID = null;
   let onHourTick = null;
   let onDayTick = null;
   let onGameEnd = null;
+  let onEvent = null; // 新增：事件回調
 
   function init() {
     state = {
@@ -24,10 +24,21 @@ const Game = (() => {
       numEat: 0,
       moisture: 50,
       soilQuality: 100,
-      hunger: 60, // 飽食度 0-100
+      hunger: 60,
+      // === v3 新增 ===
+      temperature: 23,        // 環境溫度 °C
+      soilDepth: 8,           // 土壤深度 cm (5-10 理想)
+      soilCompaction: 70,     // 土壤壓實度 0-100
+      pupaBuilt: false,       // 蛹室是否已建造
+      pupaIntegrity: 0,       // 蛹室完整度 0-100
+      pupaWarning: '',        // 蛹室警告訊息
+      dormancyHours: 0,       // 羽化後蟄伏剩餘時數
+      isDormant: false,       // 是否在蟄伏期
+      chamberCollapsed: false,// 蛹室是否崩塌
+      // ================
       bAlive: true,
       bGameover: false,
-      phase: 'playing', // title, playing, paused, ended
+      phase: 'playing',
       growthProgress: 0,
       totalGrowth: 0,
       interactCount: 0,
@@ -39,6 +50,7 @@ const Game = (() => {
     onHourTick = callbacks.onHourTick || (() => { });
     onDayTick = callbacks.onDayTick || (() => { });
     onGameEnd = callbacks.onGameEnd || (() => { });
+    onEvent = callbacks.onEvent || (() => { });
     state.phase = 'playing';
     playTimer();
   }
@@ -57,35 +69,72 @@ const Game = (() => {
 
   function addHour() {
     if (!state.bAlive || state.bGameover) return;
-
     state.numHour++;
 
-    // --- 每小時自然衰減 ---
-    // 濕度自然蒸發
-    const evapRate = isDay() ? 4 : 2;
+    // ========== 溫度自然波動 ==========
+    updateTemperature();
+
+    // ========== 蟄伏期倒數 ==========
+    if (state.isDormant) {
+      state.dormancyHours--;
+      if (state.dormancyHours <= 0) {
+        state.isDormant = false;
+        state.numLevel = 7; // 正式成為活躍成蟲
+        onEvent('dormancy-end', '🪲 獨角仙甦醒了！已成為完整的成蟲！');
+        state.bGameover = true;
+        stopTimer();
+        onGameEnd('complete');
+        return;
+      }
+      // 蟄伏期只需維持環境，不需餵食
+      state.moisture = Math.max(0, state.moisture - 1);
+      onHourTick(state);
+      checkDayChange();
+      return;
+    }
+
+    // ========== 濕度衰減 ==========
+    const tempFactor = state.temperature > 25 ? 1.5 : 1;
+    const evapRate = (isDay() ? 4 : 2) * tempFactor;
     state.moisture = Math.max(0, state.moisture - evapRate);
 
-    // 土壤每小時微量消耗
+    // ========== 土壤消耗 ==========
     state.soilQuality = Math.max(0, state.soilQuality - 0.5);
+    // 幼蟲啃食讓壓實度微降
+    if (state.numLevel >= 2 && state.numLevel <= 4) {
+      state.soilCompaction = Math.max(0, state.soilCompaction - 0.3);
+    }
 
-    // 幼蟲進食（在有土壤的情況下）
+    // ========== 幼蟲進食 ==========
     if (state.numLevel >= 2 && state.numLevel <= 4) {
       const eatAmount = Math.min(2, state.soilQuality);
       state.numEat += eatAmount;
       state.soilQuality = Math.max(0, state.soilQuality - eatAmount * 0.3);
+      // 進食也消耗土壤深度（微量）
+      state.soilDepth = Math.max(2, state.soilDepth - 0.02);
     }
 
-    // 飽食度自然下降
-    const hungerDecay = state.numLevel >= 2 && state.numLevel <= 4 ? 5 : 3;
-    state.hunger = Math.max(0, state.hunger - hungerDecay);
+    // ========== 飽食度衰減 ==========
+    if (state.numLevel >= 5) {
+      // 蛹期不需餵食，飽食度緩慢回歸
+      state.hunger = Math.max(30, state.hunger - 1);
+    } else {
+      const hungerDecay = state.numLevel >= 2 && state.numLevel <= 4 ? 3 : 2;
+      state.hunger = Math.max(0, state.hunger - hungerDecay);
+    }
 
-    // --- 體力計算 ---
+    // ========== 蛹室機制 ==========
+    if (state.numLevel === 5) {
+      updatePupaChamber();
+    }
+
+    // ========== 體力計算 ==========
     let powerDelta = 0;
 
     // 濕度影響
     if (state.moisture < 15) powerDelta -= 3;
     else if (state.moisture < 30) powerDelta -= 1;
-    else if (state.moisture > 85) powerDelta -= 2;
+    else if (state.moisture > 85) powerDelta -= 2; // 積水
     else if (state.moisture >= 40 && state.moisture <= 70) powerDelta += 0.5;
 
     // 土壤影響
@@ -93,81 +142,215 @@ const Game = (() => {
     else if (state.soilQuality < 40) powerDelta -= 0.5;
     else if (state.soilQuality > 60) powerDelta += 0.3;
 
-    // 飽食度影響
-    if (state.hunger < 15) powerDelta -= 3;
-    else if (state.hunger < 30) powerDelta -= 1;
-    else if (state.hunger >= 50 && state.hunger <= 80) powerDelta += 0.5;
-    else if (state.hunger > 90) powerDelta -= 0.5; // 過飽
+    // 飽食度影響（非蛹期）
+    if (state.numLevel < 5) {
+      if (state.hunger < 15) powerDelta -= 3;
+      else if (state.hunger < 30) powerDelta -= 1;
+      else if (state.hunger >= 50 && state.hunger <= 80) powerDelta += 0.5;
+      else if (state.hunger > 90) powerDelta -= 0.5;
+    }
+
+    // 溫度影響
+    if (state.temperature < 18 || state.temperature > 30) powerDelta -= 3;
+    else if (state.temperature < 20 || state.temperature > 28) powerDelta -= 1;
+    else if (state.temperature >= 20 && state.temperature <= 25) powerDelta += 0.5;
+
+    // 蛹室崩塌嚴重扣血
+    if (state.numLevel === 5 && state.chamberCollapsed) {
+      powerDelta -= 4;
+    }
 
     state.numPower = Math.max(0, Math.min(100, state.numPower + powerDelta));
 
-    // --- 成長累積 ---
-    if (state.numPower > 30) {
+    // ========== 成長累積 ==========
+    if (state.numPower > 30 && state.numLevel < 5) {
+      // 幼蟲期正常成長
       const hungerBonus = state.hunger > 40 ? 1 + (state.hunger / 100) * 0.5 : 0.5;
-      const growthRate = (state.numPower / 100) * (state.soilQuality / 100) * hungerBonus * 2;
+      const tempBonus = (state.temperature >= 20 && state.temperature <= 25) ? 1.2 : 0.8;
+      const growthRate = (state.numPower / 100) * (state.soilQuality / 100) * hungerBonus * tempBonus * 2;
       state.growthProgress += growthRate;
       state.totalGrowth += growthRate;
 
-      // 體型跟隨成長
       if (state.numLevel >= 2 && state.numLevel <= 4) {
         state.numSize = Math.min(100, state.numSize + growthRate * 0.3);
       }
+    } else if (state.numLevel === 5 && state.pupaBuilt && !state.chamberCollapsed) {
+      // 蛹期：環境穩定就持續成長
+      const tempBonus = (state.temperature >= 20 && state.temperature <= 25) ? 1.5 : 0.5;
+      const chamberBonus = state.pupaIntegrity / 100;
+      const pupaGrowth = tempBonus * chamberBonus * 1.5;
+      state.growthProgress += pupaGrowth;
+      state.totalGrowth += pupaGrowth;
     }
 
-    // --- 死亡判定 ---
+    // ========== 死亡判定 ==========
     if (state.numPower <= 0) {
       state.bAlive = false;
       state.bGameover = true;
       stopTimer();
-      onGameEnd('gameover');
+      if (state.numLevel === 5 && state.chamberCollapsed) {
+        onGameEnd('chamber-death');
+      } else {
+        onGameEnd('gameover');
+      }
       return;
     }
 
-    // --- 通知 ---
     onHourTick(state);
+    checkDayChange();
+  }
 
-    // --- 換日 ---
+  function checkDayChange() {
     if (state.numHour >= 24) {
       state.numHour = 0;
       state.numDay++;
-
       onDayTick(state);
 
-      // 時間到期
       if (state.numDay > MAX_DAYS) {
         state.bGameover = true;
         stopTimer();
-        if (state.numLevel >= 7) {
+        if (state.numLevel >= 7 || state.isDormant) {
           onGameEnd('complete');
         } else {
           onGameEnd('timeover');
         }
-        return;
       }
     }
   }
 
+  // ========== 溫度系統 ==========
+  function updateTemperature() {
+    // 自然日夜溫差：白天偏高，夜晚偏低
+    const baseTemp = 22;
+    const dayOffset = isDay() ? 2.5 : -1.5;
+    const random = (Math.random() - 0.5) * 1.5;
+    const target = baseTemp + dayOffset + random;
+    // 緩慢趨向目標
+    state.temperature += (target - state.temperature) * 0.15;
+    state.temperature = Math.round(state.temperature * 10) / 10;
+  }
+
+  // ========== 蛹室系統 ==========
+  function updatePupaChamber() {
+    if (!state.pupaBuilt) return;
+
+    state.pupaWarning = '';
+
+    // 蛹室完整度受環境影響
+    let integrityDelta = 0;
+
+    // 濕度影響
+    if (state.moisture < 20) {
+      integrityDelta -= 2;
+      state.pupaWarning = '⚠️ 環境過乾，蛹室壁面龜裂！';
+    } else if (state.moisture > 80) {
+      integrityDelta -= 3;
+      state.pupaWarning = '⚠️ 環境過濕，蛹室有積水風險！';
+    } else {
+      integrityDelta += 0.3; // 適度環境緩慢修復
+    }
+
+    // 土壤壓實度影響
+    if (state.soilCompaction < 30) {
+      integrityDelta -= 2;
+      state.pupaWarning = '⚠️ 土壤太鬆，蛹室結構不穩！';
+    }
+
+    // 土壤深度影響
+    if (state.soilDepth < 5) {
+      integrityDelta -= 1;
+      state.pupaWarning = '⚠️ 土壤太淺，蛹室空間不足！';
+    }
+
+    // 溫度影響
+    if (state.temperature < 18 || state.temperature > 28) {
+      integrityDelta -= 1.5;
+      state.pupaWarning = '⚠️ 溫度異常，對蛹造成壓力！';
+    }
+
+    state.pupaIntegrity = Math.max(0, Math.min(100, state.pupaIntegrity + integrityDelta));
+
+    // 崩塌判定
+    if (state.pupaIntegrity <= 0 && !state.chamberCollapsed) {
+      state.chamberCollapsed = true;
+      state.pupaWarning = '🚨 蛹室崩塌了！請緊急重建！';
+      onEvent('chamber-collapse', '🚨 蛹室崩塌了！需要立即重建，否則蛹會死亡！');
+    }
+  }
+
+  // 三齡幼蟲升級為蛹時觸發蛹室建造
+  function buildPupaChamber() {
+    if (state.numLevel !== 5) return false;
+
+    // 檢查條件
+    const canBuild = state.soilDepth >= 5 && state.soilCompaction >= 40;
+    if (!canBuild) {
+      onEvent('chamber-fail', '⚠️ 土壤條件不足！需要深度≥5cm 且壓實度≥40 才能建造蛹室');
+      return false;
+    }
+
+    state.pupaBuilt = true;
+    state.pupaIntegrity = 80 + (state.soilCompaction / 100) * 20;
+    state.chamberCollapsed = false;
+    onEvent('chamber-built', '🏗️ 幼蟲正在建造蛹室...\n使用糞便塗抹壁面，形成直立橢圓形蛹室\n深度約7cm、寬度約4cm\n\n⚠️ 蛹期間請勿觸碰蟲蟲！保持環境穩定即可。');
+    return true;
+  }
+
+  // 緊急重建蛹室
+  function rebuildChamber() {
+    if (!state.chamberCollapsed || state.numLevel !== 5) return false;
+    if (state.soilDepth < 3 || state.soilCompaction < 30) {
+      onEvent('rebuild-fail', '⚠️ 土壤條件不足，無法重建蛹室！');
+      return false;
+    }
+    state.chamberCollapsed = false;
+    state.pupaIntegrity = 50; // 重建的不如原本堅固
+    state.pupaWarning = '';
+    state.numPower = Math.max(10, state.numPower - 10); // 重建過程損傷
+    onEvent('chamber-rebuilt', '🔧 已緊急重建蛹室！但蛹受到了一些損傷。');
+    return true;
+  }
+
+  // ========== 玩家操作 ==========
   function spray() {
     if (!state.bAlive || state.phase !== 'playing') return false;
-    state.moisture = Math.min(100, state.moisture + 25);
-    // 噴水也微量恢復體力
+    // 蛹期噴水量減少（避免積水）
+    const amount = state.numLevel >= 5 ? 15 : 25;
+    state.moisture = Math.min(100, state.moisture + amount);
     state.numPower = Math.min(100, state.numPower + 1);
     return true;
   }
 
   function changeSoil() {
     if (!state.bAlive || state.phase !== 'playing') return false;
+    // 蛹期換土會破壞蛹室！
+    if (state.numLevel === 5 && state.pupaBuilt) {
+      onEvent('soil-warning', '⚠️ 蛹期間不建議換土！會破壞蛹室！');
+      return false;
+    }
     state.soilQuality = 100;
+    state.soilDepth = 8;
+    state.soilCompaction = 75;
     state.numPower = Math.min(100, state.numPower + 2);
+    return true;
+  }
+
+  function compactSoil() {
+    if (!state.bAlive || state.phase !== 'playing') return false;
+    state.soilCompaction = Math.min(100, state.soilCompaction + 20);
     return true;
   }
 
   function feed() {
     if (!state.bAlive || state.phase !== 'playing') return false;
+    // 蛹期不能餵食
+    if (state.numLevel >= 5) {
+      onEvent('feed-warning', '蛹期間不需要餵食喔！');
+      return false;
+    }
     state.hunger = Math.min(100, state.hunger + 30);
     state.numPower = Math.min(100, state.numPower + 2);
     state.feedCount++;
-    // 餵食也加速成長
     state.growthProgress += 0.5;
     state.totalGrowth += 0.5;
     return true;
@@ -175,25 +358,61 @@ const Game = (() => {
 
   function interact() {
     if (!state.bAlive || state.phase !== 'playing') return null;
+
+    // 蛹期觸碰 = 干擾蛹室！
+    if (state.numLevel === 5) {
+      if (state.pupaBuilt && !state.chamberCollapsed) {
+        state.pupaIntegrity = Math.max(0, state.pupaIntegrity - 8);
+        onEvent('pupa-disturb', '⚠️ 不要干擾蛹室！完整度下降了！');
+        return '😰';
+      }
+      return null;
+    }
+
+    // 蟄伏期不能互動
+    if (state.isDormant) {
+      onEvent('dormant-touch', '💤 牠正在蟄伏休息，請不要打擾...');
+      return '💤';
+    }
+
     state.interactCount++;
-    // 互動提升少量體力和成長
     state.numPower = Math.min(100, state.numPower + 0.5);
     state.growthProgress += 0.3;
     state.totalGrowth += 0.3;
 
-    // 隨機回應
     const reactions = ['❤️', '✨', '💕', '🎵', '😊', '⭐', '🌟'];
     return reactions[Math.floor(Math.random() * reactions.length)];
   }
 
-  // 嘗試升級，回傳是否升級
+  // ========== 成長升級 ==========
   function tryLevelUp() {
+    // 蟄伏期不升級
+    if (state.isDormant) return false;
+
     const thresholds = [0, 12, 20, 28, 38, 50, 65, 999];
     if (state.growthProgress >= thresholds[state.numLevel]) {
       state.growthProgress = 0;
+
+      // 特殊處理：三齡 → 蛹
+      if (state.numLevel === 4) {
+        state.numLevel = 5;
+        // 自動嘗試建造蛹室
+        setTimeout(() => buildPupaChamber(), 500);
+        return true;
+      }
+
+      // 特殊處理：蛹 → 羽化 → 蟄伏
+      if (state.numLevel === 5) {
+        state.numLevel = 6; // 羽化
+        // 進入蟄伏期（7~10小時）
+        state.dormancyHours = 7 + Math.floor(Math.random() * 4);
+        state.isDormant = true;
+        onEvent('eclosion', `🦋 羽化成功！\n獨角仙正在蟄伏中...\n預計 ${state.dormancyHours} 小時後甦醒\n\n請維持環境穩定，靜待牠的甦醒。`);
+        return true;
+      }
+
       state.numLevel++;
       if (state.numLevel >= 7) {
-        // 成蟲！
         state.bGameover = true;
         stopTimer();
         onGameEnd('complete');
@@ -209,22 +428,24 @@ const Game = (() => {
 
   function calcScore() {
     const photoBonus = (typeof Diary !== 'undefined') ? Diary.getCount() * 5 : 0;
+    const chamberBonus = state.pupaBuilt && !state.chamberCollapsed ? 15 : 0;
     return Math.floor(
       state.numSize * 2 +
       state.numPower +
       photoBonus +
       state.numDay * 3 +
       state.interactCount * 0.5 +
-      state.feedCount * 1
+      state.feedCount * 1 +
+      chamberBonus
     );
   }
 
   function getRank(score) {
-    if (score >= 280) return { rank: 'SSS', color: '#ffd700' };
-    if (score >= 240) return { rank: 'SS', color: '#ff8c00' };
-    if (score >= 200) return { rank: 'S', color: '#e0e0e0' };
-    if (score >= 160) return { rank: 'A', color: '#68c4e0' };
-    if (score >= 120) return { rank: 'B', color: '#7ec468' };
+    if (score >= 300) return { rank: 'SSS', color: '#ffd700' };
+    if (score >= 260) return { rank: 'SS', color: '#ff8c00' };
+    if (score >= 220) return { rank: 'S', color: '#e0e0e0' };
+    if (score >= 180) return { rank: 'A', color: '#68c4e0' };
+    if (score >= 140) return { rank: 'B', color: '#7ec468' };
     return { rank: 'C', color: '#9a8d7a' };
   }
 
@@ -241,8 +462,8 @@ const Game = (() => {
   }
 
   return {
-    init, start, stop: stopTimer, spray, changeSoil, feed, interact,
-    tryLevelUp, isDay, calcScore, getRank, getState,
-    pause, resume, playTimer, stopTimer
+    init, start, stop: stopTimer, spray, changeSoil, compactSoil,
+    feed, interact, tryLevelUp, isDay, calcScore, getRank, getState,
+    pause, resume, playTimer, stopTimer, buildPupaChamber, rebuildChamber
   };
 })();

@@ -134,8 +134,34 @@ body {
   background: linear-gradient(90deg, #c47a30, #e8a850);
 }
 
+.temp-fill {
+  background: linear-gradient(90deg, #5a8f4a, #7ec468);
+}
+
+.pupa-fill {
+  background: linear-gradient(90deg, #a06820, #d4a040);
+}
+
 .size-fill {
   background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+}
+
+.pupa-warning {
+  font-size: 11px;
+  color: #e87c7c;
+  min-height: 14px;
+  margin-top: 2px;
+  text-align: center;
+}
+
+#hud-pupa {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#hud-pupa.hidden {
+  display: none;
 }
 
 .stat-val {
