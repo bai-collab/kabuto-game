@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>養獨角仙 — 急速成長カブトムシ</title>
+  <meta name="description" content="模擬飼養獨角仙育成遊戲，從卵培育至成蟲">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Noto+Sans+JP:wght@400;700;900&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- HUD overlay -->
+    <div id="hud">
+      <div id="hud-time">
+        <span id="hud-day">第 1 天</span>
+        <span id="hud-hour">06:00</span>
+      </div>
+      <div id="hud-stats">
+        <div class="stat-bar">
+          <label>💪 體力</label>
+          <div class="bar-track">
+            <div class="bar-fill power-fill" id="bar-power"></div>
+          </div>
+          <span class="stat-val" id="val-power">100</span>
+        </div>
+        <div class="stat-bar">
+          <label>💧 濕度</label>
+          <div class="bar-track">
+            <div class="bar-fill moisture-fill" id="bar-moisture"></div>
+          </div>
+          <span class="stat-val" id="val-moisture">50</span>
+        </div>
+        <div class="stat-bar">
+          <label>🌿 土壤</label>
+          <div class="bar-track">
+            <div class="bar-fill soil-fill" id="bar-soil"></div>
+          </div>
+          <span class="stat-val" id="val-soil">100</span>
+        </div>
+        <div class="stat-bar">
+          <label>🍖 飽食</label>
+          <div class="bar-track">
+            <div class="bar-fill hunger-fill" id="bar-hunger"></div>
+          </div>
+          <span class="stat-val" id="val-hunger">60</span>
+        </div>
+        <div class="stat-bar">
+          <label>📏 體型</label>
+          <div class="bar-track">
+            <div class="bar-fill size-fill" id="bar-size"></div>
+          </div>
+          <span class="stat-val" id="val-size">10</span>
+        </div>
+      </div>
+      <div id="hud-stage">
+        <span id="stage-label">🥚 卵</span>
+        <span id="photo-count">📷 0/6</span>
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div id="action-buttons">
+      <button class="action-btn" id="btn-spray" title="噴水保濕">
+        <span class="btn-icon">💧</span>
+        <span class="btn-text">噴水</span>
+      </button>
+      <button class="action-btn" id="btn-feed" title="餵食">
+        <span class="btn-icon">🍖</span>
+        <span class="btn-text">餵食</span>
+      </button>
+      <button class="action-btn" id="btn-soil" title="更換飼育土">
+        <span class="btn-icon">🌱</span>
+        <span class="btn-text">換土</span>
+      </button>
+      <button class="action-btn" id="btn-photo" title="拍照記錄">
+        <span class="btn-icon">📷</span>
+        <span class="btn-text">拍照</span>
+      </button>
+    </div>
+
+    <!-- Title screen overlay -->
+    <div id="title-screen" class="overlay">
+      <div class="title-content">
+        <h1 class="title-main">🪲 養獨角仙</h1>
+        <h2 class="title-sub">急速成長カブトムシ</h2>
+        <p class="title-desc">從卵開始，細心照顧你的獨角仙<br>讓牠順利羽化為威風的成蟲吧！</p>
+        <button id="btn-start" class="start-btn">▶ 開始飼育</button>
+        <div class="title-tips">
+          <p>💧 噴水保濕 ｜ 🍖 餵食 ｜ 🌱 更換飼育土 ｜ 📷 記錄成長</p>
+          <p>🖱️ 點擊蟲蟲可以互動喔！</p>
+        </div>
+        <button id="btn-settings" class="settings-link">⚙️ Google Sheets 設定</button>
+      </div>
+    </div>
+
+    <!-- Growth notification -->
+    <div id="growth-notify" class="overlay hidden">
+      <div class="growth-content">
+        <h2 id="growth-title">🎉 成長!</h2>
+        <p id="growth-desc"></p>
+        <button id="btn-growth-ok" class="start-btn">繼續</button>
+      </div>
+    </div>
+
+    <!-- Diary panel -->
+    <div id="diary-panel" class="hidden">
+      <div class="diary-header">
+        <h2>📖 成長日記</h2>
+        <button id="btn-diary-close" class="diary-close">✕</button>
+      </div>
+      <div id="diary-entries" class="diary-grid"></div>
+    </div>
+
+    <!-- Ending screen -->
+    <div id="ending-screen" class="overlay hidden">
+      <div class="ending-content">
+        <h1 id="ending-title"></h1>
+        <div id="ending-beetle"></div>
+        <div id="ending-stats"></div>
+        <div id="ending-rank"></div>
+        <button id="btn-diary-view" class="start-btn">📖 查看日記</button>
+        <button id="btn-restart" class="start-btn secondary">🔄 重新開始</button>
+      </div>
+    </div>
+
+    <!-- Interaction feedback -->
+    <div id="interact-feedback" class="hidden"></div>
+
+    <!-- Settings panel -->
+    <div id="settings-panel" class="overlay hidden">
+      <div class="settings-content">
+        <h2>⚙️ Google Sheets 設定</h2>
+        <p class="settings-desc">輸入 GAS 部署網址，遊戲結束時自動儲存飼養紀錄</p>
+        <div class="settings-field">
+          <label>👤 飼育員名稱</label>
+          <input type="text" id="input-player" placeholder="你的名字" maxlength="20">
+        </div>
+        <div class="settings-field">
+          <label>🔗 GAS 網址</label>
+          <input type="url" id="input-endpoint" placeholder="https://script.google.com/macros/s/...">
+        </div>
+        <div class="settings-buttons">
+          <button id="btn-settings-save" class="start-btn">儲存</button>
+          <button id="btn-settings-close" class="start-btn secondary">取消</button>
+        </div>
+        <div id="settings-status" class="settings-status"></div>
+      </div>
+    </div>
+
+    <!-- Cloud save toast -->
+    <div id="cloud-toast" class="cloud-toast hidden"></div>
+  </div>
+
+  <script src="js/game.js"></script>
+  <script src="js/beetle.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/diary.js"></script>
+  <script src="js/cloud.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+
+</html>
