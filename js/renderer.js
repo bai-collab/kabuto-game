@@ -9,6 +9,7 @@ const Renderer = (() => {
     let particles = [];
     let soilChangeAnim = 0;
     let lastTime = 0;
+    let lastBoxBounds = null; // 儲存飼育箱範圍
 
     function init(canvasEl) {
         canvas = canvasEl;
@@ -299,6 +300,42 @@ const Renderer = (() => {
         return { boxX, boxY: soilY - 20, boxW, boxH: soilH + 20 };
     }
 
+    // ========== 大便繪製 ==========
+    function drawPoop(poopPositions) {
+        if (!lastBoxBounds || !poopPositions || poopPositions.length === 0) return;
+        const { boxX, boxY, boxW, boxH } = lastBoxBounds;
+        const soilY = boxY + 20;
+        const soilH = boxH - 20;
+
+        poopPositions.forEach((p, i) => {
+            const px = boxX + 6 + p.x * (boxW - 12);
+            const py = soilY + p.y * (soilH - 10);
+
+            // 大便本體（棕色圓形）
+            ctx.fillStyle = '#5a3a1a';
+            ctx.beginPath();
+            ctx.ellipse(px, py, 4, 3, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#4a2a0a';
+            ctx.beginPath();
+            ctx.ellipse(px + 1, py - 2, 3, 2.5, 0.3, 0, Math.PI * 2);
+            ctx.fill();
+            // 小高光
+            ctx.fillStyle = 'rgba(255,255,255,0.15)';
+            ctx.beginPath();
+            ctx.arc(px - 1, py - 2, 1, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+
+    function setBoxBounds(bounds) {
+        lastBoxBounds = bounds;
+    }
+
+    function getBoxBounds() {
+        return lastBoxBounds;
+    }
+
     // ========== 粒子系統（噴水） ==========
     function spawnSprayParticles(x, y) {
         for (let i = 0; i < 25; i++) {
@@ -433,9 +470,10 @@ const Renderer = (() => {
     function getCanvas() { return canvas; }
 
     return {
-        init, clear, drawBackground, drawBox, drawParticles, frame,
+        init, clear, drawBackground, drawBox, drawPoop, drawParticles, frame,
         drawHeatHaze,
         spawnSprayParticles, spawnSoilParticles, spawnInteractParticles,
-        getCanvasSize, getCtx, getCanvas, resize
+        getCanvasSize, getCtx, getCanvas, resize,
+        setBoxBounds, getBoxBounds
     };
 })();

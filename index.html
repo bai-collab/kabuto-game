@@ -4,8 +4,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>養獨角仙 — 急速成長カブトムシ</title>
-  <meta name="description" content="模擬飼養獨角仙育成遊戲，從卵培育至成蟲">
+  <title>🪲 獨角仙飼育師</title>
+  <meta name="description" content="獨角仙幼蟲飼育模擬遊戲 — 學習正確的環境管理決策">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
@@ -20,17 +20,21 @@
 
     <!-- HUD overlay -->
     <div id="hud">
-      <div id="hud-time">
-        <span id="hud-day">第 1 天</span>
+      <div id="hud-top">
+        <span id="day-counter">第 1 天</span>
+        <div class="stage-container">
+          <img src="pic/8QvXM1ODOx.png" alt="幼蟲" id="hud-larva-img" class="hud-larva-img">
+          <span id="stage-badge">🐛 一齡幼蟲</span>
+        </div>
         <span id="hud-hour">06:00</span>
       </div>
       <div id="hud-stats">
         <div class="stat-bar">
-          <label>💪 體力</label>
+          <label>🌡️ 溫度</label>
           <div class="bar-track">
-            <div class="bar-fill power-fill" id="bar-power"></div>
+            <div class="bar-fill temp-fill" id="bar-temp"></div>
           </div>
-          <span class="stat-val" id="val-power">100</span>
+          <span class="stat-val" id="val-temp">24°</span>
         </div>
         <div class="stat-bar">
           <label>💧 濕度</label>
@@ -40,34 +44,31 @@
           <span class="stat-val" id="val-moisture">50</span>
         </div>
         <div class="stat-bar">
-          <label>🌡 溫度</label>
+          <label>🍂 底材</label>
           <div class="bar-track">
-            <div class="bar-fill temp-fill" id="bar-temp"></div>
+            <div class="bar-fill substrate-fill" id="bar-substrate"></div>
           </div>
-          <span class="stat-val" id="val-temp">23°</span>
+          <span class="stat-val" id="val-substrate">80</span>
         </div>
         <div class="stat-bar">
-          <label>🌿 土壤</label>
+          <label>🦠 病蟲害</label>
           <div class="bar-track">
-            <div class="bar-fill soil-fill" id="bar-soil"></div>
+            <div class="bar-fill pest-fill" id="bar-pest"></div>
           </div>
-          <span class="stat-val" id="val-soil">100</span>
-        </div>
-        <div class="stat-bar">
-          <label>🍖 飽食</label>
-          <div class="bar-track">
-            <div class="bar-fill hunger-fill" id="bar-hunger"></div>
-          </div>
-          <span class="stat-val" id="val-hunger">60</span>
-        </div>
-        <div class="stat-bar">
-          <label>📏 體型</label>
-          <div class="bar-track">
-            <div class="bar-fill size-fill" id="bar-size"></div>
-          </div>
-          <span class="stat-val" id="val-size">10</span>
+          <span class="stat-val" id="val-pest">5</span>
         </div>
       </div>
+      <!-- 健康值 -->
+      <div id="hud-health">
+        <div class="stat-bar health-bar-row">
+          <label>❤️ 健康</label>
+          <div class="bar-track bar-track-lg">
+            <div class="bar-fill health-fill" id="bar-health"></div>
+          </div>
+          <span class="stat-val" id="val-health">100</span>
+        </div>
+      </div>
+      <!-- 蛹室 -->
       <div id="hud-pupa" class="hidden">
         <div class="stat-bar">
           <label>🏠 蛹室</label>
@@ -78,59 +79,75 @@
         </div>
         <div id="pupa-warning" class="pupa-warning"></div>
       </div>
-      <div id="hud-stage">
-        <span id="stage-label">🥚 卵</span>
+      <div id="hud-bottom">
         <span id="photo-count">📷 0/6</span>
+        <span id="growth-bar-label">📈 成長</span>
       </div>
     </div>
 
     <!-- Action buttons -->
     <div id="action-buttons">
-      <button class="action-btn" id="btn-spray" title="噴水保濕">
-        <span class="btn-icon">💧</span>
+      <button class="action-btn" id="btn-spray" title="噴水補濕：濕度+10%">
+        <span class="btn-icon">💦</span>
         <span class="btn-text">噴水</span>
+        <span class="btn-cd" id="cd-spray"></span>
       </button>
-      <button class="action-btn" id="btn-feed" title="餵食">
-        <span class="btn-icon">🍖</span>
-        <span class="btn-text">餵食</span>
+      <button class="action-btn" id="btn-ventilate" title="通風換氣：溫度-2°C、濕度-5%">
+        <span class="btn-icon">🌬️</span>
+        <span class="btn-text">通風</span>
+        <span class="btn-cd" id="cd-ventilate"></span>
       </button>
-      <button class="action-btn" id="btn-soil" title="更換飼育土">
-        <span class="btn-icon">🌱</span>
-        <span class="btn-text">換土</span>
+      <button class="action-btn" id="btn-substrate" title="換新底材：底材+50%、病蟲害-20%">
+        <span class="btn-icon">🍂</span>
+        <span class="btn-text">換底材</span>
+        <span class="btn-cd" id="cd-substrate"></span>
       </button>
-      <button class="action-btn" id="btn-compact" title="壓實土壤">
-        <span class="btn-icon">✊</span>
-        <span class="btn-text">壓實</span>
+      <button class="action-btn" id="btn-inspect" title="翻土觀察：查看幼蟲狀態（有副作用）">
+        <span class="btn-icon">🔍</span>
+        <span class="btn-text">翻土</span>
+        <span class="btn-cd" id="cd-inspect"></span>
+      </button>
+      <button class="action-btn" id="btn-clean" title="清除糞便：底材+15%">
+        <span class="btn-icon">🧹</span>
+        <span class="btn-text">清糞</span>
+        <span class="btn-cd" id="cd-clean"></span>
+      </button>
+      <button class="action-btn" id="btn-cool" title="降溫處理：溫度-5°C">
+        <span class="btn-icon">❄️</span>
+        <span class="btn-text">降溫</span>
+        <span class="btn-cd" id="cd-cool"></span>
+      </button>
+      <button class="action-btn" id="btn-pest" title="除蟲處理：病蟲害-30%">
+        <span class="btn-icon">🏥</span>
+        <span class="btn-text">除蟲</span>
+        <span class="btn-cd" id="cd-pest"></span>
+      </button>
+      <button class="action-btn hidden" id="btn-chamber" title="製作人工蛹室（蛹期限定）">
+        <span class="btn-icon">🏠</span>
+        <span class="btn-text">蛹室</span>
       </button>
       <button class="action-btn" id="btn-photo" title="拍照記錄">
         <span class="btn-icon">📷</span>
         <span class="btn-text">拍照</span>
-      </button>
-      <button class="action-btn" id="btn-shade" title="遮陰 / 曬太陽">
-        <span class="btn-icon">🌿</span>
-        <span class="btn-text">遮陰</span>
+        <span class="btn-cd" id="cd-photo"></span>
       </button>
       <button class="action-btn" id="btn-speed" title="調整時間速度">
         <span class="btn-icon">⏩</span>
         <span class="btn-text">1x</span>
-      </button>
-      <button class="action-btn hidden" id="btn-rebuild" title="緊急重建蛹室">
-        <span class="btn-icon">🔧</span>
-        <span class="btn-text">重建蛹室</span>
       </button>
     </div>
 
     <!-- Title screen overlay -->
     <div id="title-screen" class="overlay">
       <div class="title-content">
-        <h1 class="title-main">🪲 養獨角仙</h1>
-        <h2 class="title-sub">急速成長カブトムシ</h2>
-        <p class="title-desc">從卵開始，細心照顧你的獨角仙<br>讓牠順利羽化為威風的成蟲吧！</p>
+        <h1 class="title-main">🪲 獨角仙飼育師</h1>
+        <h2 class="title-sub">カブトムシ飼育シミュレーション</h2>
+        <p class="title-desc">扮演甲蟲飼育師，從一顆卵開始<br>透過正確的環境管理，將獨角仙養育至成蟲羽化！</p>
         <button id="btn-start" class="start-btn">▶ 開始飼育</button>
         <div class="title-tips">
-          <p>💧 噴水 ｜ 🍖 餵食 ｜ 🌱 換土 ｜ ✊ 壓實 ｜ 📷 拍照</p>
-          <p>🌡 真實模擬：溫度、土壤深度、蛹室建造、羍化蛟伏</p>
-          <p>🖱️ 點擊蟲蟲可以互動（蛹期請勿打擾！）</p>
+          <p>🌡️ 溫度 ｜ 💧 濕度 ｜ 🍂 底材 ｜ 🦠 病蟲害</p>
+          <p>💦 噴水 ｜ 🌬️ 通風 ｜ 🍂 換底材 ｜ 🔍 翻土 ｜ 🧹 清糞 ｜ ❄️ 降溫 ｜ 🏥 除蟲</p>
+          <p>⚠️ 隨機事件！正確的飼育決策才能讓幼蟲健康成長</p>
         </div>
         <button id="btn-settings" class="settings-link">⚙️ Google Sheets 設定</button>
       </div>
@@ -140,8 +157,23 @@
     <div id="growth-notify" class="overlay hidden">
       <div class="growth-content">
         <h2 id="growth-title">🎉 成長!</h2>
+        <img id="growth-image" class="growth-image hidden" src="">
         <p id="growth-desc"></p>
         <button id="btn-growth-ok" class="start-btn">繼續</button>
+      </div>
+    </div>
+
+    <!-- Random Event Choice dialog -->
+    <div id="event-choice" class="overlay hidden">
+      <div class="event-content">
+        <h2 id="event-title">⚠️ 事件</h2>
+        <p id="event-desc"></p>
+        <div class="event-buttons">
+          <button id="btn-event-a" class="event-btn correct">選項 A</button>
+          <button id="btn-event-b" class="event-btn wrong">選項 B</button>
+        </div>
+        <p id="event-result" class="event-result hidden"></p>
+        <button id="btn-event-ok" class="start-btn hidden">繼續</button>
       </div>
     </div>
 
@@ -158,7 +190,9 @@
     <div id="ending-screen" class="overlay hidden">
       <div class="ending-content">
         <h1 id="ending-title"></h1>
-        <div id="ending-beetle"></div>
+        <div id="ending-beetle">
+          <img src="pic/2ZKrpVsOas.png" alt="成蟲" class="ending-adult-img">
+        </div>
         <div id="ending-stats"></div>
         <div id="ending-rank"></div>
         <button id="btn-diary-view" class="start-btn">📖 查看日記</button>
@@ -168,6 +202,9 @@
 
     <!-- Interaction feedback -->
     <div id="interact-feedback" class="hidden"></div>
+
+    <!-- Knowledge card toast -->
+    <div id="knowledge-toast" class="knowledge-toast hidden"></div>
 
     <!-- Settings panel -->
     <div id="settings-panel" class="overlay hidden">

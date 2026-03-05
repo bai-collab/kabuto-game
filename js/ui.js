@@ -1,79 +1,71 @@
 /* ============================================
-   ui.js — DOM UI 互動 v3
-   按鈕、HUD、面板控制、蛹室 UI
+   ui.js — DOM UI 互動 v4
+   8操作按鈕、4指標HUD、事件對話框
    ============================================ */
 
 const UI = (() => {
-    let cooldowns = { spray: 0, feed: 0, soil: 0, compact: 0, photo: 0, rebuild: 0 };
-    const COOLDOWN_TIME = { spray: 2000, feed: 3000, soil: 5000, compact: 3000, photo: 1500, rebuild: 2000 };
+    let cooldowns = {};
+    const COOLDOWN_TIME = {
+        spray: 0,
+        ventilate: 0,
+        substrate: 0,
+        inspect: 0,
+        clean: 0,
+        cool: 0,
+        pest: 0,
+        photo: 0,
+    };
 
     function init(callbacks) {
-        document.getElementById('btn-spray').addEventListener('click', () => {
-            if (cooldowns.spray > 0) return;
-            callbacks.onSpray();
-            startCooldown('spray');
+        // 初始化冷卻
+        for (const key of Object.keys(COOLDOWN_TIME)) {
+            cooldowns[key] = 0;
+        }
+
+        // 8 個操作按鈕
+        bindBtn('btn-spray', 'spray', callbacks.onSpray);
+        bindBtn('btn-ventilate', 'ventilate', callbacks.onVentilate);
+        bindBtn('btn-substrate', 'substrate', callbacks.onSubstrate);
+        bindBtn('btn-inspect', 'inspect', callbacks.onInspect);
+        bindBtn('btn-clean', 'clean', callbacks.onClean);
+        bindBtn('btn-cool', 'cool', callbacks.onCool);
+        bindBtn('btn-pest', 'pest', callbacks.onPest);
+        bindBtn('btn-photo', 'photo', callbacks.onPhoto);
+
+        // 蛹室（無冷卻，一次性）
+        document.getElementById('btn-chamber').addEventListener('click', () => {
+            if (callbacks.onChamber) callbacks.onChamber();
         });
 
-        document.getElementById('btn-feed').addEventListener('click', () => {
-            if (cooldowns.feed > 0) return;
-            callbacks.onFeed();
-            startCooldown('feed');
-        });
-
-        document.getElementById('btn-soil').addEventListener('click', () => {
-            if (cooldowns.soil > 0) return;
-            callbacks.onSoil();
-            startCooldown('soil');
-        });
-
-        document.getElementById('btn-compact').addEventListener('click', () => {
-            if (cooldowns.compact > 0) return;
-            callbacks.onCompact();
-            startCooldown('compact');
-        });
-
-        document.getElementById('btn-photo').addEventListener('click', () => {
-            if (cooldowns.photo > 0) return;
-            callbacks.onPhoto();
-            startCooldown('photo');
-        });
-
-        document.getElementById('btn-rebuild').addEventListener('click', () => {
-            if (cooldowns.rebuild > 0) return;
-            callbacks.onRebuild();
-            startCooldown('rebuild');
-        });
-
-        document.getElementById('btn-shade').addEventListener('click', () => {
-            if (callbacks.onShade) callbacks.onShade();
-        });
-
+        // 速度
         document.getElementById('btn-speed').addEventListener('click', () => {
             if (callbacks.onSpeed) callbacks.onSpeed();
         });
 
+        // 日記
         document.getElementById('btn-diary-close').addEventListener('click', () => {
             hideDiary();
             if (callbacks.onDiaryClose) callbacks.onDiaryClose();
         });
-
         document.getElementById('btn-diary-view').addEventListener('click', () => {
             showDiary();
         });
 
+        // 重啟
         document.getElementById('btn-restart').addEventListener('click', () => {
             callbacks.onRestart();
         });
 
+        // 成長通知
         document.getElementById('btn-growth-ok').addEventListener('click', () => {
             hideGrowthNotify();
             if (callbacks.onGrowthOk) callbacks.onGrowthOk();
         });
 
+        // 設定
         document.getElementById('btn-settings').addEventListener('click', () => {
             showSettings();
         });
-
         document.getElementById('btn-settings-save').addEventListener('click', () => {
             const endpoint = document.getElementById('input-endpoint').value.trim();
             const name = document.getElementById('input-player').value.trim();
@@ -83,25 +75,48 @@ const UI = (() => {
             statusEl.style.color = '#7ec468';
             setTimeout(() => hideSettings(), 1000);
         });
-
         document.getElementById('btn-settings-close').addEventListener('click', () => {
             hideSettings();
         });
     }
 
-    function startCooldown(type) {
-        const btnMap = {
-            spray: 'btn-spray', feed: 'btn-feed', soil: 'btn-soil',
-            compact: 'btn-compact', photo: 'btn-photo', rebuild: 'btn-rebuild'
-        };
-        const btn = document.getElementById(btnMap[type]);
-        if (!btn) return;
+    function bindBtn(btnId, cdKey, callback) {
+        const btn = document.getElementById(btnId);
+        if (!btn || !callback) return;
+        btn.addEventListener('click', () => {
+            if (cooldowns[cdKey] > 0) return;
+            callback();
+            startCooldown(cdKey, btnId);
+        });
+    }
+
+    function startCooldown(type, btnId) {
+        const btn = document.getElementById(btnId);
+        if (!btn || !COOLDOWN_TIME[type]) return;
         btn.classList.add('cooldown');
         cooldowns[type] = COOLDOWN_TIME[type];
-        setTimeout(() => {
-            btn.classList.remove('cooldown');
-            cooldowns[type] = 0;
-        }, COOLDOWN_TIME[type]);
+
+        const cdEl = document.getElementById(`cd-${type}`);
+        const totalMs = COOLDOWN_TIME[type];
+        let remaining = totalMs;
+
+        const updateCD = () => {
+            remaining -= 100;
+            cooldowns[type] = remaining;
+            if (cdEl) {
+                const secs = Math.ceil(remaining / 1000);
+                cdEl.textContent = secs > 0 ? `${secs}s` : '';
+            }
+            if (remaining <= 0) {
+                clearInterval(cdInterval);
+                btn.classList.remove('cooldown');
+                cooldowns[type] = 0;
+                if (cdEl) cdEl.textContent = '';
+            }
+        };
+
+        if (cdEl) cdEl.textContent = `${Math.ceil(totalMs / 1000)}s`;
+        const cdInterval = setInterval(updateCD, 100);
     }
 
     function showPlaying() {
@@ -110,7 +125,7 @@ const UI = (() => {
         document.getElementById('hud').style.display = 'block';
         document.getElementById('action-buttons').style.display = 'flex';
         document.getElementById('hud-pupa').classList.add('hidden');
-        document.getElementById('btn-rebuild').classList.add('hidden');
+        document.getElementById('btn-chamber').classList.add('hidden');
     }
 
     function showEnding(type, gameState) {
@@ -124,34 +139,39 @@ const UI = (() => {
         const stats = document.getElementById('ending-stats');
         const rankEl = document.getElementById('ending-rank');
 
-        const score = Game.calcScore();
-        const { rank, color } = Game.getRank(score);
+        const scores = Game.calcScore();
+        const { rank, label, color } = Game.getRank(scores.total);
 
         if (type === 'complete') {
             title.textContent = '🎉 恭喜！成功羽化！';
             title.style.color = '#f0d68a';
-        } else if (type === 'gameover' || type === 'chamber-death') {
-            title.textContent = type === 'chamber-death'
-                ? '💀 蛹室崩塌，獨角仙死亡了...'
-                : '💀 獨角仙死亡了...';
+            document.querySelector('.ending-adult-img').style.display = 'block';
+        } else if (type === 'gameover' || type === 'chamber-death' || type === 'pest-death') {
+            const deathMsg = type === 'chamber-death' ? '蛹室崩塌'
+                : type === 'pest-death' ? '病蟲害致死' : '環境惡劣';
+            title.textContent = `💀 ${deathMsg}，獨角仙死亡了...`;
             title.style.color = '#c45a5a';
+            document.querySelector('.ending-adult-img').style.display = 'none';
         } else {
             title.textContent = '⏰ 時間到！';
             title.style.color = '#d4a843';
+            document.querySelector('.ending-adult-img').style.display = 'none';
         }
 
         const stage = Beetle.getStage(gameState.numLevel);
         stats.innerHTML = `
       ${stage.emoji} 最終階段：${stage.name}<br>
-      📏 體型：${Math.floor(gameState.numSize)}<br>
-      💪 體力：${Math.floor(gameState.numPower)}<br>
-      🌡 溫度：${gameState.temperature.toFixed(1)}°C<br>
-      🏠 蛹室：${gameState.pupaBuilt ? (gameState.chamberCollapsed ? '崩塌' : `${Math.floor(gameState.pupaIntegrity)}%`) : '未建造'}<br>
-      🍖 餵食：${gameState.feedCount} 次<br>
-      📷 照片：${Diary.getCount()} / 6<br>
-      🖱️ 互動：${gameState.interactCount} 次<br>
-      📅 存活：${gameState.numDay} 天<br>
-      🏆 總分：${score}
+      <br>
+      <strong>📊 飼育評分（滿分 100）</strong><br>
+      🌡️ 溫度管理：${scores.tempScore} / 20<br>
+      💧 濕度管理：${scores.moistureScore} / 20<br>
+      🍂 底材品質：${scores.substrateScore} / 20<br>
+      🦠 病蟲害控制：${scores.pestScore} / 20<br>
+      📋 事件應對：${scores.eventScore} / 20<br>
+      <br>
+      🏆 總分：${scores.total}<br>
+      🪲 成蟲體型：${label}<br>
+      📅 存活：${gameState.numDay} 天
     `;
 
         rankEl.textContent = rank;
@@ -161,76 +181,116 @@ const UI = (() => {
     function updateHUD(gameState) {
         const stage = Beetle.getStage(gameState.numLevel);
 
-        document.getElementById('hud-day').textContent = `第 ${gameState.numDay} 天`;
-        document.getElementById('hud-hour').textContent =
-            `${String(gameState.numHour).padStart(2, '0')}:00`;
+        document.getElementById('day-counter').textContent = `第 ${gameState.numDay} 天`;
 
-        setBar('bar-power', gameState.numPower, 100);
-        setBar('bar-moisture', gameState.moisture, 100);
-        setBar('bar-soil', gameState.soilQuality, 100);
-        setBar('bar-hunger', gameState.hunger, 100);
-        setBar('bar-size', gameState.numSize, 100);
-
-        // 溫度條：18-30°C 映射為 0-100%
-        const tempPercent = Math.max(0, Math.min(100, ((gameState.temperature - 15) / 20) * 100));
-        setBar('bar-temp', tempPercent, 100);
-        document.getElementById('val-temp').textContent = `${gameState.temperature.toFixed(1)}°`;
-
-        // 溫度條顏色
-        const tempBar = document.getElementById('bar-temp');
-        if (gameState.temperature >= 20 && gameState.temperature <= 25) {
-            tempBar.style.background = 'linear-gradient(90deg, #5a8f4a, #7ec468)';
-        } else if (gameState.temperature < 18 || gameState.temperature > 28) {
-            tempBar.style.background = 'linear-gradient(90deg, #c45a5a, #e87c7c)';
+        // 切換左上角大頭貼顯示（僅1~4齡顯示）
+        const larvaImg = document.getElementById('hud-larva-img');
+        if (gameState.numLevel >= 1 && gameState.numLevel <= 4) {
+            larvaImg.style.display = 'block';
         } else {
-            tempBar.style.background = 'linear-gradient(90deg, #c47a30, #e8a850)';
+            larvaImg.style.display = 'none';
         }
 
-        document.getElementById('val-power').textContent = Math.floor(gameState.numPower);
-        document.getElementById('val-moisture').textContent = Math.floor(gameState.moisture);
-        document.getElementById('val-soil').textContent = Math.floor(gameState.soilQuality);
-        document.getElementById('val-hunger').textContent = Math.floor(gameState.hunger);
-        document.getElementById('val-size').textContent = Math.floor(gameState.numSize);
+        document.getElementById('stage-badge').textContent = `${stage.emoji} ${stage.name}`;
 
-        // 蛹室 UI
+        const hourTxt = gameState.numHour.toString().padStart(2, '0') + ':00';
+        document.getElementById('hud-hour').textContent = hourTxt;
+
+        // 4 大指標
+        // 溫度：15~36°C 映射 0~100%
+        const tempPercent = Math.max(0, Math.min(100, ((gameState.temperature - 15) / 21) * 100));
+        setBar('bar-temp', tempPercent, 100);
+        document.getElementById('val-temp').textContent = `${gameState.temperature.toFixed(1)}°`;
+        colorTempBar(gameState.temperature);
+
+        setBar('bar-moisture', gameState.moisture, 100);
+        document.getElementById('val-moisture').textContent = `${Math.floor(gameState.moisture)}%`;
+        colorIndicatorBar('bar-moisture', gameState.moisture, 40, 55, 30, 70);
+
+        setBar('bar-substrate', gameState.substrateQuality, 100);
+        document.getElementById('val-substrate').textContent = Math.floor(gameState.substrateQuality);
+        colorIndicatorBar('bar-substrate', gameState.substrateQuality, 60, 100, 30, 999, true);
+
+        // 病蟲害（反向：越高越危險）
+        setBar('bar-pest', gameState.pestIndex, 100);
+        document.getElementById('val-pest').textContent = Math.floor(gameState.pestIndex);
+        colorPestBar(gameState.pestIndex);
+
+        // 健康
+        setBar('bar-health', gameState.health, 100);
+        document.getElementById('val-health').textContent = Math.floor(gameState.health);
+
+        // 蛹室
         const pupaHud = document.getElementById('hud-pupa');
         if (gameState.numLevel >= 5 && gameState.pupaBuilt) {
             pupaHud.classList.remove('hidden');
             setBar('bar-pupa', gameState.pupaIntegrity, 100);
             document.getElementById('val-pupa').textContent = Math.floor(gameState.pupaIntegrity);
             document.getElementById('pupa-warning').textContent = gameState.pupaWarning || '';
-
-            // 蛹室崩塌時顯示重建按鈕
-            const rebuildBtn = document.getElementById('btn-rebuild');
-            if (gameState.chamberCollapsed) {
-                rebuildBtn.classList.remove('hidden');
-            } else {
-                rebuildBtn.classList.add('hidden');
-            }
         } else {
             pupaHud.classList.add('hidden');
-            document.getElementById('btn-rebuild').classList.add('hidden');
         }
 
-        // 蛹期隱藏餵食按鈕
-        const feedBtn = document.getElementById('btn-feed');
-        const soilBtn = document.getElementById('btn-soil');
-        if (gameState.numLevel >= 5 || gameState.isDormant) {
-            feedBtn.classList.add('hidden');
-            soilBtn.classList.add('hidden');
+        // 蛹室按鈕（蛹期且崩塌時顯示）
+        const chamberBtn = document.getElementById('btn-chamber');
+        if (gameState.numLevel === 5 && gameState.chamberCollapsed && !gameState.artificialChamberUsed) {
+            chamberBtn.classList.remove('hidden');
         } else {
-            feedBtn.classList.remove('hidden');
-            soilBtn.classList.remove('hidden');
+            chamberBtn.classList.add('hidden');
         }
 
-        // 蟄伏期顯示
+        // 蟄伏期
         const stageText = gameState.isDormant
             ? `💤 蟄伏中（剩餘 ${gameState.dormancyHours} 小時）`
             : `${stage.emoji} ${stage.name}`;
-
-        document.getElementById('stage-label').textContent = stageText;
+        document.getElementById('stage-badge').textContent = stageText;
         document.getElementById('photo-count').textContent =
             `📷 ${Diary.getCount()}/6`;
+    }
+
+    function colorTempBar(temp) {
+        const bar = document.getElementById('bar-temp');
+        if (temp >= 23 && temp <= 26) {
+            bar.style.background = 'linear-gradient(90deg, #5a8f4a, #7ec468)';
+        } else if (temp < 15 || temp > 30) {
+            bar.style.background = 'linear-gradient(90deg, #c45a5a, #e87c7c)';
+        } else {
+            bar.style.background = 'linear-gradient(90deg, #c47a30, #e8a850)';
+        }
+    }
+
+    function colorIndicatorBar(barId, value, safeMin, safeMax, dangerMin, dangerMax, inverted) {
+        const bar = document.getElementById(barId);
+        if (inverted) {
+            // 高好型（底材）
+            if (value >= safeMin) {
+                bar.style.background = 'linear-gradient(90deg, #5a8f4a, #7ec468)';
+            } else if (value >= dangerMin) {
+                bar.style.background = 'linear-gradient(90deg, #c47a30, #e8a850)';
+            } else {
+                bar.style.background = 'linear-gradient(90deg, #c45a5a, #e87c7c)';
+            }
+        } else {
+            // 區間好型（濕度）
+            if (value >= safeMin && value <= safeMax) {
+                bar.style.background = 'linear-gradient(90deg, #4a7a9f, #6db4e0)';
+            } else if (value < dangerMin || value > dangerMax) {
+                bar.style.background = 'linear-gradient(90deg, #c45a5a, #e87c7c)';
+            } else {
+                bar.style.background = 'linear-gradient(90deg, #c47a30, #e8a850)';
+            }
+        }
+    }
+
+    function colorPestBar(pest) {
+        const bar = document.getElementById('bar-pest');
+        if (pest <= 20) {
+            bar.style.background = 'linear-gradient(90deg, #5a8f4a, #7ec468)';
+        } else if (pest <= 50) {
+            bar.style.background = 'linear-gradient(90deg, #c47a30, #e8a850)';
+        } else {
+            bar.style.background = 'linear-gradient(90deg, #8b3a8b, #c45a5a)';
+        }
     }
 
     function setBar(id, value, max) {
@@ -260,6 +320,16 @@ const UI = (() => {
         const screen = document.getElementById('growth-notify');
         screen.classList.remove('hidden');
         document.getElementById('growth-title').textContent = title;
+
+        // 羽化事件顯示破蛹圖
+        const growthImg = document.getElementById('growth-image');
+        if (title.includes('羽化')) {
+            growthImg.src = 'pic/LbJUMWKWTP.png';
+            growthImg.classList.remove('hidden');
+        } else {
+            growthImg.classList.add('hidden');
+        }
+
         const desc = document.getElementById('growth-desc');
         desc.textContent = message;
         desc.style.whiteSpace = 'pre-line';
@@ -267,6 +337,61 @@ const UI = (() => {
 
     function hideGrowthNotify() {
         document.getElementById('growth-notify').classList.add('hidden');
+        document.getElementById('growth-image').classList.add('hidden');
+    }
+
+    // ========== 隨機事件對話框 ==========
+    function showEventChoice(evt, onChoose) {
+        const screen = document.getElementById('event-choice');
+        screen.classList.remove('hidden');
+
+        document.getElementById('event-title').textContent = evt.name;
+        document.getElementById('event-desc').textContent = evt.desc;
+        document.getElementById('event-desc').style.whiteSpace = 'pre-line';
+        document.getElementById('event-result').classList.add('hidden');
+        document.getElementById('btn-event-ok').classList.add('hidden');
+
+        const btnA = document.getElementById('btn-event-a');
+        const btnB = document.getElementById('btn-event-b');
+        btnA.textContent = evt.optionA.text;
+        btnB.textContent = evt.optionB.text;
+        btnA.style.display = '';
+        btnB.style.display = '';
+
+        // 移除舊 listener
+        const newBtnA = btnA.cloneNode(true);
+        const newBtnB = btnB.cloneNode(true);
+        btnA.replaceWith(newBtnA);
+        btnB.replaceWith(newBtnB);
+
+        newBtnA.addEventListener('click', () => {
+            const result = onChoose(true);
+            showEventResult(result, true);
+        });
+        newBtnB.addEventListener('click', () => {
+            const result = onChoose(false);
+            showEventResult(result, false);
+        });
+    }
+
+    function showEventResult(resultText, isCorrect) {
+        document.getElementById('btn-event-a').style.display = 'none';
+        document.getElementById('btn-event-b').style.display = 'none';
+
+        const resultEl = document.getElementById('event-result');
+        resultEl.textContent = (isCorrect ? '✅ ' : '❌ ') + resultText;
+        resultEl.style.color = isCorrect ? '#7ec468' : '#e87c7c';
+        resultEl.classList.remove('hidden');
+
+        const okBtn = document.getElementById('btn-event-ok');
+        okBtn.classList.remove('hidden');
+
+        const newOkBtn = okBtn.cloneNode(true);
+        okBtn.replaceWith(newOkBtn);
+        newOkBtn.addEventListener('click', () => {
+            document.getElementById('event-choice').classList.add('hidden');
+            Game.resume();
+        });
     }
 
     function showDiary() {
@@ -313,23 +438,30 @@ const UI = (() => {
         el.style.animation = 'toastIn 0.3s ease';
         setTimeout(() => el.classList.add('hidden'), 3000);
     }
-    function updateShadeBtn(isShaded) {
-        const btn = document.getElementById('btn-shade');
-        btn.querySelector('.btn-icon').textContent = isShaded ? '☀️' : '🌿';
-        btn.querySelector('.btn-text').textContent = isShaded ? '曬太陽' : '遮陰';
+
+    function showKnowledgeToast(msg) {
+        const el = document.getElementById('knowledge-toast');
+        el.innerHTML = msg;
+        el.classList.remove('hidden');
+        el.style.animation = 'none';
+        void el.offsetWidth;
+        el.style.animation = 'toastIn 0.3s ease';
+        setTimeout(() => el.classList.add('hidden'), 5000);
     }
 
     function updateSpeedBtn(speed) {
         const btn = document.getElementById('btn-speed');
-        btn.querySelector('.btn-icon').textContent = speed === 1 ? '⏩' : '⏸️';
-        btn.querySelector('.btn-text').textContent = speed === 1 ? '1x' : '0.5x';
+        const labels = { 1: '1x', 2: '2x', 3: '3x' };
+        btn.querySelector('.btn-icon').textContent = speed >= 3 ? '⏸️' : '⏩';
+        btn.querySelector('.btn-text').textContent = labels[speed] || '1x';
     }
 
     return {
         init, showPlaying, showEnding, updateHUD,
         showGrowthNotify, showEventNotify, hideGrowthNotify,
+        showEventChoice,
         showDiary, hideDiary, showInteractFeedback,
         showSettings, hideSettings, showCloudToast,
-        updateShadeBtn, updateSpeedBtn
+        showKnowledgeToast, updateSpeedBtn,
     };
 })();
