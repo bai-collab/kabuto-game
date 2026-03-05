@@ -18,7 +18,7 @@
         Cloud.init();
 
         const { w, h } = Renderer.getCanvasSize();
-        beetlePos = { x: w * 0.5, y: h * 0.62 };
+        beetlePos = { x: w * 0.45, y: h * 0.65 };
 
         UI.init({
             onSpray: handleSpray,
@@ -88,8 +88,8 @@
         Renderer.frame(dt);
         Game.tryLevelUp();
 
-        beetlePos.x = w * 0.5;
-        beetlePos.y = h * 0.62;
+        beetlePos.x = w * 0.45;
+        beetlePos.y = h * 0.65;
 
         // 繪製
         Renderer.clear();

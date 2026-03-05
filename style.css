@@ -47,8 +47,8 @@ body {
 
 #game-container {
   position: relative;
-  width: 480px;
-  height: 720px;
+  width: 960px;
+  height: 540px;
   border-radius: 16px;
   overflow: hidden;
   box-shadow: var(--shadow), var(--shadow-glow);
@@ -67,8 +67,8 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  padding: 12px 16px;
-  background: linear-gradient(180deg, rgba(20, 15, 5, 0.9) 0%, transparent 100%);
+  padding: 8px 16px;
+  background: linear-gradient(180deg, rgba(20, 15, 5, 0.92) 0%, transparent 100%);
   pointer-events: none;
   z-index: 10;
   display: none;
@@ -78,8 +78,8 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
-  font-size: 14px;
+  margin-bottom: 4px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--gold-light);
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
@@ -87,8 +87,8 @@ body {
 
 #hud-stats {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 6px 12px;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px 10px;
 }
 
 .stat-bar {
@@ -192,11 +192,12 @@ body {
 /* === Action Buttons === */
 #action-buttons {
   position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
   display: none;
-  gap: 16px;
+  flex-direction: column;
+  gap: 8px;
   z-index: 10;
 }
 
@@ -204,10 +205,10 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 12px 20px;
+  gap: 2px;
+  padding: 8px 14px;
   border: 1px solid var(--gold-dim);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   background: var(--bg-glass);
   backdrop-filter: blur(10px);
   color: var(--text);
@@ -216,6 +217,7 @@ body {
   font-family: var(--font);
   user-select: none;
   -webkit-user-select: none;
+  min-width: 56px;
 }
 
 .action-btn:hover {
@@ -235,12 +237,12 @@ body {
 }
 
 .btn-icon {
-  font-size: 28px;
+  font-size: 22px;
   line-height: 1;
 }
 
 .btn-text {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--text-dim);
 }
@@ -650,7 +652,7 @@ body {
 }
 
 /* === Responsive === */
-@media (max-width: 500px) {
+@media (max-width: 980px) {
   #game-container {
     width: 100vw;
     height: 100vh;
@@ -663,6 +665,20 @@ body {
 
   .title-sub {
     font-size: 16px;
+  }
+
+  #hud-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  #action-buttons {
+    top: auto;
+    bottom: 8px;
+    right: 50%;
+    transform: translateX(50%);
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
   }
 }
 
