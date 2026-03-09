@@ -159,15 +159,29 @@ const UI = (() => {
         }
 
         const stage = Beetle.getStage(gameState.numLevel);
+        const pupaLine = (gameState.numLevel >= 5 && gameState.pupaBuilt)
+            ? `<br>🏗️ 蛹室完整度：${Math.floor(gameState.pupaIntegrity)}%`
+            : '';
+        const eventLine = scores.eventTotal > 0
+            ? `📋 事件應對：+${scores.eventBonus} / 20<br>`
+            : `📋 事件應對：無事件（不計分）<br>`;
+
         stats.innerHTML = `
       ${stage.emoji} 最終階段：${stage.name}<br>
       <br>
-      <strong>📊 飼育評分（滿分 100）</strong><br>
+      <strong>📈 結束時數值</strong><br>
+      🌡️ 溫度：${gameState.temperature.toFixed(1)}°C<br>
+      💧 濕度：${Math.floor(gameState.moisture)}%<br>
+      🍂 底材品質：${Math.floor(gameState.substrateQuality)}%<br>
+      🦠 病蟲害指數：${Math.floor(gameState.pestIndex)}%<br>
+      ❤️ 健康值：${Math.floor(gameState.health)}%${pupaLine}<br>
+      <br>
+      <strong>📊 飼育評分（基礎 80 分）</strong><br>
       🌡️ 溫度管理：${scores.tempScore} / 20<br>
       💧 濕度管理：${scores.moistureScore} / 20<br>
       🍂 底材品質：${scores.substrateScore} / 20<br>
       🦠 病蟲害控制：${scores.pestScore} / 20<br>
-      📋 事件應對：${scores.eventScore} / 20<br>
+      ${eventLine}
       <br>
       🏆 總分：${scores.total}<br>
       🪲 成蟲體型：${label}<br>

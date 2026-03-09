@@ -632,7 +632,7 @@ const Game = (() => {
     return state.numHour >= 6 && state.numHour < 18;
   }
 
-  // ========== 評分系統（5維度各20分，滿分100） ==========
+  // ========== 評分系統（4指標各20分共80分，事件應對最多+20加分） ==========
   function calcScore() {
     const t = state.scoreTracking;
 
@@ -640,15 +640,20 @@ const Game = (() => {
     const moisturePct = t.moistureSamples > 0 ? t.moistureScore / t.moistureSamples : 0;
     const substratePct = t.substrateSamples > 0 ? t.substrateScore / t.substrateSamples : 0;
     const pestPct = t.pestSamples > 0 ? t.pestScore / t.pestSamples : 0;
-    const eventPct = t.eventTotal > 0 ? t.eventCorrect / t.eventTotal : 1;
+
+    const base = Math.round((tempPct + moisturePct + substratePct + pestPct) * 20);
+
+    // 事件應對：有遭遇事件才計算加分，沒遇到事件不加也不扣
+    const eventBonus = t.eventTotal > 0 ? Math.round((t.eventCorrect / t.eventTotal) * 20) : 0;
 
     return {
       tempScore: Math.round(tempPct * 20),
       moistureScore: Math.round(moisturePct * 20),
       substrateScore: Math.round(substratePct * 20),
       pestScore: Math.round(pestPct * 20),
-      eventScore: Math.round(eventPct * 20),
-      total: Math.round((tempPct + moisturePct + substratePct + pestPct + eventPct) * 20),
+      eventBonus,
+      eventTotal: t.eventTotal,
+      total: Math.min(100, base + eventBonus),
     };
   }
 
